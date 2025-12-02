@@ -1,0 +1,41 @@
+# 工作流名称（自定义，比如“自动部署 GitHub Pages”）
+name: Deploy GitHub Pages Automatically
+
+# 触发条件：当代码推送到 main 分支时，自动执行工作流
+on:
+  push:
+    branches: [ main ] # 只监听 main 分支的推送
+
+# 工作流任务（在云端虚拟环境执行）
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # 云端虚拟环境：Ubuntu 系统（稳定、快速）
+
+    # 任务步骤（按顺序执行）
+    steps:
+      # 步骤 1：拉取仓库代码到虚拟环境
+      - name: Checkout code
+        uses: actions/checkout@v4 # 官方工具，拉取代码
+
+      # 步骤 2：安装 Node.js（适配你的项目 Node 版本，建议选 18.x 或 20.x）
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18' # 推荐 18.x（兼容 Vite/React）
+          cache: 'npm' # 缓存依赖，加速下次构建
+
+      # 步骤 3：安装项目依赖（对应本地的 npm install）
+      - name: Install dependencies
+        run: npm install # 云端执行安装依赖
+
+      # 步骤 4：打包生成 dist 文件夹（对应本地的 npm run build）
+      - name: Build project
+        run: npm run build # 云端打包，生成 dist
+
+      # 步骤 5：将 dist 部署到 GitHub Pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4 # 主流的 Pages 部署工具，稳定可靠
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }} # 自动生成的令牌，无需手动配置
+          publish_dir: ./dist # 要部署的文件夹（打包后的 dist）
+          publish_branch: gh-pages # 部署到哪个分支（固定为 gh-pages，GitHub Pages 专用）
