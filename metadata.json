@@ -1,0 +1,5 @@
+{
+  "name": "数据治理面板Data Governance Dashboard",
+  "description": "A data visualization dashboard for data governance metrics, supporting Excel data upload and automatic chart generation.",
+  "requestFramePermissions": []
+}
