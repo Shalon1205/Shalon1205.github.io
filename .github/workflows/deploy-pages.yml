@@ -6,6 +6,13 @@ on:
   push:
     branches: [ main ] # 只监听 main 分支的推送
 
+#  新增：添加工作流权限声明（关键）
+permissions:
+  contents: write # 允许读写仓库内容（含创建分支）
+  pages: write # 允许操作 GitHub Pages
+  id-token: write # 自动认证（适配最新 GitHub 安全策略）
+
+
 # 工作流任务（在云端虚拟环境执行）
 jobs:
   build-and-deploy:
