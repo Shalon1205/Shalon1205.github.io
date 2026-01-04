@@ -1,40 +1,35 @@
-// 引入 Netlify Blobs 客户端
+// 引入Blobs工具包（必须有，不然用不了存储）
 import { getStore } from '@netlify/blobs';
 
+// 主逻辑：接收前端的Excel数据，存到Blobs里
 export default async (req, context) => {
+  // 解决跨域问题（避免前端调用接口报错）
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+
+  // 如果是OPTIONS请求，直接返回成功（Netlify要求）
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers });
+  }
+
   try {
-    // 1. 仅允许 POST 请求
-    if (req.method !== 'POST') {
-      return new Response('仅支持 POST 请求', { status: 405 });
-    }
-
-    // 2. 验证管理员密钥（防止他人篡改）
-    const ADMIN_KEY = Netlify.env.get('ADMIN_KEY'); // 从环境变量读取
-    const requestKey = req.headers.get('X-Admin-Key');
-    if (!requestKey || requestKey !== ADMIN_KEY) {
-      return new Response('无权限保存数据', { status: 403 });
-    }
-
-    // 3. 解析前端传入的 JSON 数据
-    const { data } = await req.json();
-    if (!data) {
-      return new Response('请传入有效数据', { status: 400 });
-    }
-
-    // 4. 连接 Blobs 存储（storeName 自定义，比如 "dashboard-data"）
+    // 创建Blobs存储库（名字叫dashboard-data，固定不变）
     const store = getStore('dashboard-data');
-
-    // 5. 存储数据（key 为 "latest"，覆盖旧数据，仅保留最新一条）
-    await store.put('latest', JSON.stringify(data));
-
-    return new Response(JSON.stringify({ success: true, message: '数据保存成功' }), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 200
+    // 接收前端传的Excel数据
+    const excelData = await req.json();
+    // 把数据存到Blobs，命名为latest-excel（方便后续读取）
+    await store.set('latest-excel', JSON.stringify(excelData));
+    // 返回成功提示给前端
+    return new Response(JSON.stringify({ status: "success", msg: "数据保存成功！" }), {
+      headers: { ...headers, "Content-Type": "application/json" }
     });
   } catch (error) {
-    console.error('保存失败：', error);
-    return new Response(JSON.stringify({ success: false, message: '保存失败' }), {
-      headers: { 'Content-Type': 'application/json' },
+    // 出错了返回错误提示
+    return new Response(JSON.stringify({ status: "error", msg: "保存失败：" + error.message }), {
+      headers: { ...headers, "Content-Type": "application/json" },
       status: 500
     });
   }
