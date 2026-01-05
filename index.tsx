@@ -25,7 +25,7 @@ const App = () => {
   // 核心：读取数据的函数
   const loadSavedData = async () => {
     // 替换为你的 Netlify 读取接口地址！！！
-    const readApiUrl = "https://shalon1205/.netlify/functions/read-data";
+    const readApiUrl = "https://shalon1205.netlify.app/.netlify/functions/read-data";
     
     try {
       setIsLoading(true);
