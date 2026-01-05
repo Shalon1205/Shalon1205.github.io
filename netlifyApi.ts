@@ -1,66 +1,50 @@
-// src/netlifyApi.ts
-// 1. 替换成你的Netlify站点域名（必须正确，否则接口调用失败）
+// 替换为你的 Netlify 站点域名（在 Netlify 项目概览页复制，格式：https://xxx.netlify.app）
 const NETLIFY_DOMAIN = 'https://shalon1205.netlify.app';
 
-// 2. 替换成你在Netlify环境变量里配置的ADMIN_KEY
-const ADMIN_KEY = 'Suwen@1717feizhen';
-
-
 /**
- * 功能：把解析后的Excel数据，上传到Netlify Blobs保存
- * @param parsedData 你解析后的Excel数据（JSON格式，比如{销量: 100, 增长率: 20}）
- * @returns 是否保存成功（true/false）
+ * 保存Excel数据到Netlify Blobs
+ * @param parsedData 解析后的Excel数据
+ * @returns 是否保存成功
  */
 export const saveDataToNetlify = async (parsedData: any) => {
   try {
-    // 调用Netlify Functions的save-data接口
     const response = await fetch(`${NETLIFY_DOMAIN}/.netlify/functions/save-data`, {
-      method: 'POST', // 必须是POST请求（和后端接口一致）
+      method: 'POST',
       headers: {
-        'Content-Type': 'application/json', // 告诉后端传的是JSON数据
-        'X-Admin-Key': ADMIN_KEY // 携带管理员密钥，后端验证权限
+        'Content-Type': 'application/json', // 仅保留JSON头，移除ADMIN_KEY
       },
-      body: JSON.stringify({ data: parsedData }) // 把解析后的数据转成JSON字符串传给后端
+      body: JSON.stringify(parsedData), // 直接传数据，无需包在data里
     });
 
-    // 解析后端返回的结果
     const result = await response.json();
-    if (result.success) {
-      alert('数据已长效保存！刷新/分享都能看到最新内容~');
+    if (result.status === 'success') {
+      alert('Excel解析成功！数据已长效保存~');
       return true;
     } else {
-      alert('数据保存失败：' + result.message);
+      alert('保存失败：' + result.msg);
       return false;
     }
   } catch (error) {
-    console.error('保存数据时网络出错：', error);
-    alert('网络异常，保存失败，请稍后再试~');
+    console.error('网络请求失败：', error);
+    alert('网络异常，保存失败，请检查Netlify部署是否成功~');
     return false;
   }
 };
 
-
 /**
- * 功能：从Netlify Blobs读取最新保存的仪表盘数据
- * @returns 最新数据（JSON格式）/null（无数据时）
+ * 从Netlify Blobs读取最新数据
+ * @returns 最新Excel数据
  */
 export const getLatestDataFromNetlify = async () => {
   try {
-    // 调用Netlify Functions的get-latest-data接口
     const response = await fetch(`${NETLIFY_DOMAIN}/.netlify/functions/get-latest-data`, {
-      method: 'GET' // 必须是GET请求（和后端接口一致）
+      method: 'GET',
     });
 
-    // 解析后端返回的结果
-    const result = await response.json();
-    if (result.success) {
-      return result.data; // 返回保存的最新数据
-    } else {
-      console.error('读取数据失败：', result.message);
-      return null;
-    }
+    const data = await response.json();
+    return data; // 直接返回数据，无需解析success字段
   } catch (error) {
-    console.error('读取数据时网络出错：', error);
+    console.error('读取数据失败：', error);
     return null;
   }
 };
