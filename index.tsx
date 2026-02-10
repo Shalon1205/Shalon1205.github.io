@@ -28,7 +28,7 @@ const App = () => {
   // 新增：管理员密钥（和你原有逻辑一致，可自行修改）
   const ADMIN_KEY = "admin"; // 替换为你的实际管理员密钥
 
-  // 核心：读取数据的函数
+  // 核心：强化版读取数据函数（过滤无效数据）
   const loadSavedData = async () => {
     // 你的Netlify读取接口地址（已填好）
     const readApiUrl = "https://shalon1205.netlify.app/.netlify/functions/read-data";
@@ -45,18 +45,20 @@ const App = () => {
       }
 
       const result = await response.json();
-      console.log("读取到的数据：", result);
+      console.log("Blobs读取结果：", result);
 
-      if (result.status === "success" && result.data) {
-        // 校验返回的数据是否为数组
-        if (Array.isArray(result.data)) {
-          setChartData(result.data);
-          setErrorMsg("");
-        } else {
-          // 不是数组，提示格式错误
-          setChartData([]);
-          setErrorMsg("数据格式错误：读取到的内容不是数组");
-        }
+      if (result.status === "success" && Array.isArray(result.data)) {
+        // 🌟 新增：过滤有效数据（确保每个项都有month字段，数值为数字）
+        const validData = result.data.filter((item: any) => {
+          return (
+            item.month && typeof item.month === 'string' &&
+            !isNaN(Number(item.exploration)) &&
+            !isNaN(Number(item.reserves))
+          );
+        }) as QualityMetric[];
+        
+        setChartData(validData);
+        setErrorMsg(validData.length === 0 ? "数据为空，请上传包含有效列的Excel" : "");
       } else if (result.status === "empty") {
         setChartData([]);
         setErrorMsg("暂无保存的Excel数据");
@@ -83,7 +85,7 @@ const App = () => {
     }
   };
 
-  // 新增：Excel上传并保存到Netlify Blobs
+  // 🌟 修复版：Excel上传并强制匹配QualityMetric格式
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -96,9 +98,31 @@ const App = () => {
         const workbook = XLSX.read(data, { type: 'array' });
         // 取第一个工作表的数据
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        // 转换为JSON数组（适配QualityMetric类型）
-        const parsedData = XLSX.utils.sheet_to_json(worksheet) as QualityMetric[];
+        // 🌟 强制映射Excel列名到QualityMetric格式（适配中文/英文列名）
+        const parsedData = XLSX.utils.sheet_to_json(worksheet).map((row: any) => ({
+          month: row['月份'] || row['month'] || '', // 适配Excel的“月份”或“month”列
+          exploration: Number(row['勘探'] || row['exploration'] || 0), // 适配“勘探”列
+          reserves: Number(row['储量'] || row['reserves'] || 0), // 适配“储量”列
+          development: Number(row['开发'] || row['development'] || 0), // 适配“开发”列
+          production: Number(row['生产'] || row['production'] || 0), // 适配“生产”列
+          engineering: Number(row['工程'] || row['engineering'] || 0), // 适配“工程”列
+          drilling: Number(row['钻井'] || row['drilling'] || 0), // 适配“钻井”列
+          averageScore: Number(row['平均分'] || row['averageScore'] || 0) // 适配“平均分”列
+        })) as QualityMetric[];
         
+        // 🌟 新增：验证解析后的数据有效性
+        if (parsedData.length === 0) {
+          alert("Excel解析失败：未读取到任何数据！");
+          return;
+        }
+        const firstRow = parsedData[0];
+        if (!firstRow.month || firstRow.month === "") {
+          alert("Excel格式错误：请确保包含“月份”列（列名可填：月份/month）！");
+          return;
+        }
+
+        console.log("解析后的Excel数据（适配格式）：", parsedData);
+
         // 2. 上传到Netlify Blobs
         const saveApiUrl = "https://shalon1205.netlify.app/.netlify/functions/save-data";
         const response = await fetch(saveApiUrl, {
