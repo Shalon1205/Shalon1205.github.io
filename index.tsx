@@ -42,22 +42,29 @@ const App = () => {
       console.log("读取到的数据：", result);
 
       if (result.status === "success" && result.data) {
-        // 假设返回的 data 是符合 QualityMetric 格式的数组
-        setChartData(result.data);
-        setErrorMsg("");
-      } else if (result.status === "empty") {
-        setChartData([]);
-        setErrorMsg("暂无保存的Excel数据");
-      } else {
-        setErrorMsg(`加载失败：${result.msg || "未知错误"}`);
-      }
-    } catch (error) {
-      const err = error as Error;
-      setErrorMsg(`加载数据出错：${err.message}`);
-      console.error("读取数据错误详情：", err);
-    } finally {
-      setIsLoading(false);
-    }
+  // 假设返回的 data 是符合 QualityMetric 格式的数组
+  // 新增：校验返回的数据是否为数组
+  if (Array.isArray(result.data)) {
+    setChartData(result.data);
+    setErrorMsg("");
+  } else {
+    // 不是数组，提示格式错误
+    setChartData([]);
+    setErrorMsg("数据格式错误：读取到的内容不是数组");
+  }
+} else if (result.status === "empty") {
+  setChartData([]);
+  setErrorMsg("暂无保存的Excel数据");
+} else {
+  setErrorMsg(`加载失败：${result.msg || "未知错误"}`);
+}
+} catch (error) {
+const err = error as Error;
+setErrorMsg(`加载数据出错：${err.message}`);
+console.error("读取数据错误详情：", err);
+} finally {
+setIsLoading(false);
+}
   };
 
   // 页面初始化时自动读取数据
