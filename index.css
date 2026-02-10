@@ -1,0 +1,14 @@
+/* 确保按钮/组件正常显示 */
+.upload-button, .login-button {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 8px 0;
+}
+.dashboard-container {
+  padding: 20px;
+}
