@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, 
@@ -312,12 +311,25 @@ export const QualityChart: React.FC<{ data: QualityMetric[] }> = ({ data }) => {
   const [hiddenSeries, setHiddenSeries] = useState<string[]>([]);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
 
+  // 🌟 核心修复：空数据时生成默认占位数据（匹配QualityMetric格式）
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) {
+      // 默认空数据：3个月份，所有数值为0
+      return [
+        { month: "1月", exploration: 0, reserves: 0, development: 0, production: 0, engineering: 0, drilling: 0, averageScore: 0 },
+        { month: "2月", exploration: 0, reserves: 0, development: 0, production: 0, engineering: 0, drilling: 0, averageScore: 0 },
+        { month: "3月", exploration: 0, reserves: 0, development: 0, production: 0, engineering: 0, drilling: 0, averageScore: 0 }
+      ];
+    }
+    return data;
+  }, [data]);
+
   // Calculate the absolute minimum value from the dataset to set dynamic defaults
   const minDataValue = useMemo(() => {
-    if (!data || data.length === 0) return 0;
+    if (chartData.length === 0) return 0;
     
     let minVal = 100;
-    data.forEach(item => {
+    chartData.forEach(item => {
       const scores = [
         item.exploration, item.reserves, item.development, 
         item.production, item.engineering, item.drilling, item.averageScore
@@ -329,35 +341,28 @@ export const QualityChart: React.FC<{ data: QualityMetric[] }> = ({ data }) => {
       }
     });
     return parseFloat(minVal.toFixed(2));
-  }, [data]);
+  }, [chartData]);
 
   // Dynamically set yMin default when data loads or changes
   useEffect(() => {
-    if (data && data.length > 0) {
+    if (chartData.length > 0) {
       // Default to 97, but if data has values < 97, default to that min value
       const defaultVal = minDataValue < 97 ? minDataValue : 97;
       setYMin(defaultVal.toString());
     } else {
       setYMin("0");
     }
-  }, [minDataValue, data]);
+  }, [minDataValue, chartData]);
 
   // Calculate dynamic bar size based on number of data points (months/quarters)
   const barSize = useMemo(() => {
-    if (!data || data.length === 0) return 6;
-    if (data.length <= 3) return 20;
-    if (data.length <= 6) return 12;
+    if (chartData.length === 0) return 6;
+    if (chartData.length <= 3) return 20;
+    if (chartData.length <= 6) return 12;
     return 6;
-  }, [data]);
+  }, [chartData]);
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-        请上传数据以展示图表
-      </div>
-    );
-  }
-
+  // 🌟 移除原有的空数据提示，始终渲染图表
   const handleYMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setYMin(e.target.value);
   };
@@ -473,7 +478,7 @@ export const QualityChart: React.FC<{ data: QualityMetric[] }> = ({ data }) => {
     <div className="w-full h-full relative">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
-          data={data}
+          data={chartData} // 使用处理后的chartData（包含默认空数据）
           // Reduced margins to maximize visual area while leaving space for custom legend at bottom
           margin={{ top: 25, right: 10, bottom: 25, left: 10 }}
           barGap={0}
