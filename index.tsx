@@ -26,7 +26,7 @@ const App = () => {
   // 新增：登录状态管理
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   // 新增：管理员密钥（和你原有逻辑一致，可自行修改）
-  const ADMIN_KEY = "your-admin-key-here"; // 替换为你的实际管理员密钥
+  const ADMIN_KEY = "admin"; // 替换为你的实际管理员密钥
 
   // 核心：读取数据的函数
   const loadSavedData = async () => {
