@@ -1,80 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QualityChart } from './components/Charts.tsx';
-// 引入Excel解析库（和你原有上传逻辑一致）
+// 引入所有图表组件（还原最初的多图表结构）
+import { 
+  QualityChart, 
+  VolumeDonutChart, 
+  SixNodesWidget, 
+  FeedbackPieChart, 
+  UserGaugeChart, 
+  ScenarioBarChart 
+} from './components/Charts.tsx';
 import * as XLSX from 'xlsx';
+// 引入图表类型（与最初设计一致）
+import { TotalVolumeData, NodeProgressItem, FeedbackData, QualityMetric, UserMetric, ScenarioItem } from './types';
 
-// 定义数据类型（和你的 QualityMetric 保持一致）
-interface QualityMetric {
-  month: string;
-  exploration: number;
-  reserves: number;
-  development: number;
-  production: number;
-  engineering: number;
-  drilling: number;
-  averageScore: number;
-}
+// 定义“空数据”（用于未上传数据时显示空白框架）
+const EMPTY_DATA = {
+  volume: { new: 0, history: 0 } as TotalVolumeData,
+  nodes: [] as NodeProgressItem[],
+  feedback: [] as FeedbackData[],
+  quality: [] as QualityMetric[],
+  user: { active: 0, total: 0, percentage: 0, isEmpty: true } as UserMetric,
+  scenario: [] as ScenarioItem[]
+};
 
 const App = () => {
-  // 存储读取到的图表数据
-  const [chartData, setChartData] = useState<QualityMetric[]>([]);
-  // 加载状态（可选，用于显示加载中）
+  // 所有图表的数据状态（与最初设计一致）
+  const [chartData, setChartData] = useState(EMPTY_DATA);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  // 错误信息
   const [errorMsg, setErrorMsg] = useState<string>("");
-  // 新增：登录状态管理
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  // 新增：管理员密钥（和你原有逻辑一致，可自行修改）
-  const ADMIN_KEY = "admin"; // 替换为你的实际管理员密钥
+  const ADMIN_KEY = "admin"; // 管理员密钥（可自定义）
 
-  // 核心：强化版读取数据函数（过滤无效数据）
+  // 加载数据（从Netlify Blobs读取，适配多图表）
   const loadSavedData = async () => {
-    // 你的Netlify读取接口地址（已填好）
     const readApiUrl = "https://shalon1205.netlify.app/.netlify/functions/read-data";
-    
     try {
       setIsLoading(true);
-      const response = await fetch(readApiUrl, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" }
-      });
-
-      if (!response.ok) {
-        throw new Error(`接口请求失败：${response.status}`);
-      }
-
+      const response = await fetch(readApiUrl, { method: "GET" });
+      if (!response.ok) throw new Error(`接口请求失败：${response.status}`);
       const result = await response.json();
-      console.log("Blobs读取结果：", result);
 
-      if (result.status === "success" && Array.isArray(result.data)) {
-        // 🌟 新增：过滤有效数据（确保每个项都有month字段，数值为数字）
-        const validData = result.data.filter((item: any) => {
-          return (
-            item.month && typeof item.month === 'string' &&
-            !isNaN(Number(item.exploration)) &&
-            !isNaN(Number(item.reserves))
-          );
-        }) as QualityMetric[];
-        
-        setChartData(validData);
-        setErrorMsg(validData.length === 0 ? "数据为空，请上传包含有效列的Excel" : "");
+      if (result.status === "success" && result.data) {
+        // 若上传的Excel包含多图表数据，需扩展解析逻辑；此处先适配quality数据
+        const validQualityData = Array.isArray(result.data) ? result.data : [];
+        setChartData({ ...EMPTY_DATA, quality: validQualityData });
+        setErrorMsg("");
       } else if (result.status === "empty") {
-        setChartData([]);
-        setErrorMsg("暂无保存的Excel数据");
+        setChartData(EMPTY_DATA); // 未上传数据时显示所有空白图表
+        setErrorMsg("");
       } else {
         setErrorMsg(`加载失败：${result.msg || "未知错误"}`);
       }
     } catch (error) {
       const err = error as Error;
       setErrorMsg(`加载数据出错：${err.message}`);
-      console.error("读取数据错误详情：", err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 新增：管理员登录函数
+  // 管理员登录（与最初逻辑一致）
   const handleLogin = () => {
     const inputKey = prompt("请输入管理员密钥：");
     if (inputKey === ADMIN_KEY) {
@@ -85,56 +70,44 @@ const App = () => {
     }
   };
 
-  // 🌟 修复版：Excel上传并强制匹配QualityMetric格式
+  // Excel上传（解析后同步多图表数据）
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
-      // 1. 解析Excel文件
       const reader = new FileReader();
       reader.onload = async (event) => {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
-        // 取第一个工作表的数据
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        // 🌟 强制映射Excel列名到QualityMetric格式（适配中文/英文列名）
-        const parsedData = XLSX.utils.sheet_to_json(worksheet).map((row: any) => ({
-          month: row['月份'] || row['month'] || '', // 适配Excel的“月份”或“month”列
-          exploration: Number(row['勘探'] || row['exploration'] || 0), // 适配“勘探”列
-          reserves: Number(row['储量'] || row['reserves'] || 0), // 适配“储量”列
-          development: Number(row['开发'] || row['development'] || 0), // 适配“开发”列
-          production: Number(row['生产'] || row['production'] || 0), // 适配“生产”列
-          engineering: Number(row['工程'] || row['engineering'] || 0), // 适配“工程”列
-          drilling: Number(row['钻井'] || row['drilling'] || 0), // 适配“钻井”列
-          averageScore: Number(row['平均分'] || row['averageScore'] || 0) // 适配“平均分”列
-        })) as QualityMetric[];
         
-        // 🌟 新增：验证解析后的数据有效性
-        if (parsedData.length === 0) {
-          alert("Excel解析失败：未读取到任何数据！");
-          return;
-        }
-        const firstRow = parsedData[0];
-        if (!firstRow.month || firstRow.month === "") {
-          alert("Excel格式错误：请确保包含“月份”列（列名可填：月份/month）！");
+        // 解析Excel为quality数据（若需多图表，需从不同工作表/列解析）
+        const parsedQualityData = XLSX.utils.sheet_to_json(worksheet).map((row: any) => ({
+          month: row['月份'] || row['month'] || '',
+          exploration: Number(row['勘探'] || row['exploration'] || 0),
+          reserves: Number(row['储量'] || row['reserves'] || 0),
+          development: Number(row['开发'] || row['development'] || 0),
+          production: Number(row['生产'] || row['production'] || 0),
+          engineering: Number(row['工程'] || row['engineering'] || 0),
+          drilling: Number(row['钻井'] || row['drilling'] || 0),
+          averageScore: Number(row['平均分'] || row['averageScore'] || 0)
+        })) as QualityMetric[];
+
+        if (parsedQualityData.length === 0 || !parsedQualityData[0].month) {
+          alert("Excel格式错误，请包含‘月份’‘勘探’等列！");
           return;
         }
 
-        console.log("解析后的Excel数据（适配格式）：", parsedData);
-
-        // 2. 上传到Netlify Blobs
+        // 上传到Netlify Blobs
         const saveApiUrl = "https://shalon1205.netlify.app/.netlify/functions/save-data";
         const response = await fetch(saveApiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(parsedData)
+          body: JSON.stringify(parsedQualityData)
         });
-
         const result = await response.json();
         if (result.status === "success") {
-          alert("Excel解析成功！数据已长效保存~");
-          // 3. 上传成功后重新加载数据
+          alert("Excel解析成功！数据已保存~");
           loadSavedData();
         } else {
           alert("保存失败：" + result.msg);
@@ -142,25 +115,21 @@ const App = () => {
       };
       reader.readAsArrayBuffer(file);
     } catch (error) {
-      const err = error as Error;
-      alert("上传失败：" + err.message);
-      console.error("Excel上传错误：", err);
+      alert("上传失败：" + (error as Error).message);
     }
   };
 
-  // 页面初始化时自动读取数据
+  // 页面初始化加载数据
   useEffect(() => {
     loadSavedData();
-    // 空依赖：仅在组件挂载时执行一次
   }, []);
 
   return (
-    <div className="min-h-screen p-4">
+    <div className="min-h-screen p-4 bg-slate-50">
+      {/* 头部（与最初设计一致） */}
       <header className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-slate-800">数据治理仪表盘</h1>
-        
         <div className="flex gap-2">
-          {/* 登录按钮：未登录时显示 */}
           {!isLoggedIn && (
             <button 
               onClick={handleLogin}
@@ -169,16 +138,12 @@ const App = () => {
               管理员登录
             </button>
           )}
-
-          {/* 重新加载数据按钮：始终显示 */}
           <button 
             onClick={loadSavedData}
             className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
           >
             重新加载数据
           </button>
-
-          {/* Excel上传按钮：登录后显示 */}
           {isLoggedIn && (
             <label className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 cursor-pointer">
               上传Excel
@@ -193,22 +158,50 @@ const App = () => {
         </div>
       </header>
 
-      {/* 加载状态/错误提示 */}
-      {isLoading && (
-        <div className="flex items-center justify-center h-64 text-slate-500">
-          正在加载数据...
-        </div>
-      )}
-
-      {!isLoading && errorMsg && (
+      {/* 错误提示 */}
+      {errorMsg && (
         <div className="mb-4 p-2 text-red-500 bg-red-50 rounded">
           {errorMsg}
         </div>
       )}
 
-      {/* 图表组件：传递读取到的数据 */}
-      <div className="h-[600px] w-full">
-        <QualityChart data={chartData} />
+      {/* 核心：完整仪表盘Grid布局（还原最初设计） */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* 1. 数据量环形图 */}
+        <div className="h-64 bg-white rounded-lg shadow-sm p-4">
+          <h2 className="text-sm font-semibold text-slate-700 mb-2">数据量分布</h2>
+          <VolumeDonutChart data={chartData.volume} />
+        </div>
+
+        {/* 2. 节点进度图 */}
+        <div className="h-64 bg-white rounded-lg shadow-sm p-4">
+          <h2 className="text-sm font-semibold text-slate-700 mb-2">节点进度</h2>
+          <SixNodesWidget data={chartData.nodes} />
+        </div>
+
+        {/* 3. 反馈分布饼图 */}
+        <div className="h-64 bg-white rounded-lg shadow-sm p-4">
+          <h2 className="text-sm font-semibold text-slate-700 mb-2">反馈分布</h2>
+          <FeedbackPieChart data={chartData.feedback} />
+        </div>
+
+        {/* 4. 质量评分趋势图（占全屏宽度） */}
+        <div className="h-80 bg-white rounded-lg shadow-sm p-4 col-span-1 md:col-span-2 lg:col-span-3">
+          <h2 className="text-sm font-semibold text-slate-700 mb-2">质量评分趋势</h2>
+          <QualityChart data={chartData.quality} />
+        </div>
+
+        {/* 5. 用户活跃度Gauge图 */}
+        <div className="h-64 bg-white rounded-lg shadow-sm p-4">
+          <h2 className="text-sm font-semibold text-slate-700 mb-2">用户活跃度</h2>
+          <UserGaugeChart data={chartData.user} />
+        </div>
+
+        {/* 6. 场景进度图 */}
+        <div className="h-64 bg-white rounded-lg shadow-sm p-4 col-span-1 md:col-span-2">
+          <h2 className="text-sm font-semibold text-slate-700 mb-2">场景进度</h2>
+          <ScenarioBarChart data={chartData.scenario} />
+        </div>
       </div>
     </div>
   );
