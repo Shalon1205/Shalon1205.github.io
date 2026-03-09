@@ -81,15 +81,24 @@ const App = () => {
       console.log("读取到的数据：", result);
 
       if (result.status === "success" && result.data) {
-        // 验证数据格式是否匹配
+        // 🌟 优化：严格校验所有QualityMetric字段，与后端返回格式完全匹配
         const isValidData = Array.isArray(result.data) && result.data.every(item => 
-          item.month && typeof item.averageScore === 'number'
+          // 校验月份（必填且为字符串）
+          item.month && typeof item.month === 'string' &&
+          // 校验所有数值字段（必须是数字类型）
+          typeof item.exploration === 'number' &&
+          typeof item.reserves === 'number' &&
+          typeof item.development === 'number' &&
+          typeof item.production === 'number' &&
+          typeof item.engineering === 'number' &&
+          typeof item.drilling === 'number' &&
+          typeof item.averageScore === 'number'
         );
         if (isValidData) {
           setChartData(result.data);
           setErrorMsg("");
         } else {
-          throw new Error("接口返回数据格式不匹配");
+          throw new Error("接口返回数据格式不匹配：缺少字段或字段类型错误");
         }
       } else if (result.status === "empty") {
         setChartData([]);
