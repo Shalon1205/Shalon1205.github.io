@@ -14,6 +14,39 @@ interface QualityMetric {
   averageScore: number;
 }
 
+// 定义模拟数据变量
+const MOCK_CHART_DATA: QualityMetric[] = [
+  {
+    month: "2024-01",
+    exploration: 85,
+    reserves: 90,
+    development: 88,
+    production: 92,
+    engineering: 87,
+    drilling: 89,
+    averageScore: 88.5
+  },
+  {
+    month: "2024-02",
+    exploration: 87,
+    reserves: 91,
+    development: 89,
+    production: 93,
+    engineering: 88,
+    drilling: 90,
+    averageScore: 89.6
+  },
+  {
+    month: "2024-03",
+    exploration: 89,
+    reserves: 92,
+    development: 90,
+    production: 94,
+    engineering: 89,
+    drilling: 91,
+    averageScore: 90.8
+  }
+];
 
 const App = () => {
   // 存储读取到的图表数据
