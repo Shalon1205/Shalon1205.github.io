@@ -21,7 +21,7 @@ export default async (req, context) => {
     // 读取已保存的latest-excel数据（字符串格式）
     const savedExcelStr = await store.get('latest-excel');
 
-    // 🌟 优化1：无数据时返回空数组（而非null），避免前端拿到null报错
+    // 优化1：无数据时返回空数组（而非null），避免前端拿到null报错
     if (!savedExcelStr) {
       return new Response(
         JSON.stringify({ status: "empty", msg: "暂无保存数据", data: [] }),
@@ -29,15 +29,31 @@ export default async (req, context) => {
       );
     }
 
-    // 🌟 优化2：安全解析JSON + 强制转为数组
+    // 优化2：安全解析JSON + 强制转为数组 + 校验QualityMetric格式
     let savedExcelData = []; // 默认空数组
     try {
       // 解析存储的字符串为JS对象/数组
       savedExcelData = JSON.parse(savedExcelStr);
-      // 校验：如果解析后不是数组，强制转为空数组
+      
+      // 校验1：如果解析后不是数组，强制转为空数组
       if (!Array.isArray(savedExcelData)) {
         savedExcelData = [];
         console.warn("读取到的数据不是数组，已自动转为空数组");
+      } else {
+        // 校验2：过滤并修正数据，确保每个项符合QualityMetric类型定义
+        savedExcelData = savedExcelData.map(item => {
+          // 为缺失的字段设置默认值，确保类型正确
+          return {
+            month: item.month || "", // 月份字段必须是字符串
+            exploration: typeof item.exploration === 'number' ? item.exploration : 0,
+            reserves: typeof item.reserves === 'number' ? item.reserves : 0,
+            development: typeof item.development === 'number' ? item.development : 0,
+            production: typeof item.production === 'number' ? item.production : 0,
+            engineering: typeof item.engineering === 'number' ? item.engineering : 0,
+            drilling: typeof item.drilling === 'number' ? item.drilling : 0,
+            averageScore: typeof item.averageScore === 'number' ? item.averageScore : 0
+          };
+        }).filter(item => item.month.trim() !== ""); // 过滤掉无月份的无效数据
       }
     } catch (parseError) {
       // 解析失败（比如数据格式损坏），仍返回空数组
@@ -50,7 +66,7 @@ export default async (req, context) => {
       JSON.stringify({
         status: "success",
         msg: "数据读取成功",
-        data: savedExcelData // 确保最终返回的是数组
+        data: savedExcelData // 确保最终返回的是符合QualityMetric格式的数组
       }),
       { headers: { ...headers, "Content-Type": "application/json" } }
     );
